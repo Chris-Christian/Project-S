@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Orrery Web App</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+        .controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
+        }
+        .controls button {
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button id="speedButton">2x Speed</button>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        camera.position.set(20, 10, 30);
+        controls.update();
+
+        // Load Textures
+        const textureLoader = new THREE.TextureLoader();
+        const sunTexture = textureLoader.load('textures/sunmap.jpg');
+        const earthTexture = textureLoader.load('textures/earth.jpg');
+        const moonTexture = textureLoader.load('textures/moonmap.jpg');
+        const cometTexture = textureLoader.load('textures/comet.jpg');
+
+        // Add Sun
+        const sunGeometry = new THREE.SphereGeometry(2, 32, 32);
+        const sunMaterial = new THREE.MeshBasicMaterial({ map: sunTexture });
+        const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+        scene.add(sun);
+
+        // Planet Data
+        const planetData = [
+            { name: 'Mercury', texture: 'textures/mercurymap.jpg', radius: 0.38, distance: 4, speed: 0.03 },
+            { name: 'Venus', texture: 'textures/venusmap.jpg', radius: 0.95, distance: 6, speed: 0.02 },
+            { name: 'Earth', texture: 'textures/earthmap.jpg', radius: 1, distance: 8, speed: 0.015 },
+            { name: 'Mars', texture: 'textures/mars_1k_color.jpg', radius: 0.53, distance: 11, speed: 0.012 },
+            { name: 'Jupiter', texture: 'textures/jupitermap.jpg', radius: 1.9, distance: 15, speed: 0.008 },
+            { name: 'Saturn', texture: 'textures/saturnmap.jpg', radius: 1.6, distance: 20, speed: 0.007 },
+            { name: 'Uranus', texture: 'textures/uranusmap.jpg', radius: 1.4, distance: 25, speed: 0.005 },
+            { name: 'Neptune', texture: 'textures/neptunemap.jpg', radius: 1.3, distance: 30, speed: 0.004 },
+        ];
+
+        let speedMultiplier = 1;
+        let planetAngles = {};
+        let moonAngle = 0;
+        let cometAngles = { halleysComet: 0, hyakutakeComet: 0, haleBoppComet: 0 };
+
+        const planets = planetData.map(data => {
+            const geometry = new THREE.SphereGeometry(data.radius, 32, 32);
+            const texture = textureLoader.load(data.texture);
+            const material = new THREE.MeshBasicMaterial({ map: texture });
+            const planet = new THREE.Mesh(geometry, material);
+            planet.name = data.name;
+            planet.distance = data.distance;
+            planet.speed = data.speed;
+            planetAngles[data.name] = 0;
+            scene.add(planet);
+            return planet;
+        });
+
+        // Add Earth's Moon
+        const moonGeometry = new THREE.SphereGeometry(0.27, 32, 32);
+        const moonMaterial = new THREE.MeshBasicMaterial({ map: moonTexture });
+        const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+        moon.distanceFromEarth = 2;
+        scene.add(moon);
+
+        // Add Asteroid Belt
+        function createAsteroidBelt(radius, numAsteroids) {
+            for (let i = 0; i < numAsteroids; i++) {
+                const geometry = new THREE.SphereGeometry(0.1, 16, 16);
+                const material = new THREE.MeshBasicMaterial({ color: Math.random() * 0xffffff });
+                const asteroid = new THREE.Mesh(geometry, material);
+                const angle = Math.random() * Math.PI * 2;
+                const distance = radius + Math.random() * 1;
+                asteroid.position.set(Math.cos(angle) * distance, 0, Math.sin(angle) * distance);
+                scene.add(asteroid);
+            }
+        }
+        createAsteroidBelt(12, 100);
+
+        // Add Orbits
+        function createOrbit(radius) {
+            const orbitGeometry = new THREE.RingGeometry(radius - 0.05, radius + 0.05, 64);
+            const orbitMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+            const orbit = new THREE.Mesh(orbitGeometry, orbitMaterial);
+            orbit.rotation.x = Math.PI / 2;
+            scene.add(orbit);
+            return orbit;
+        }
+        planetData.forEach(data => createOrbit(data.distance));
+        createOrbit(12);
+
+        // Add Comets
+        function createComet(texture, distance, speed) {
+            const geometry = new THREE.SphereGeometry(0.2, 16, 16);
+            const cometMaterial = new THREE.MeshBasicMaterial({ map: texture });
+            const comet = new THREE.Mesh(geometry, cometMaterial);
+            comet.distance = distance;
+            comet.speed = speed;
+            scene.add(comet);
+            return comet;
+        }
+        const halleysComet = createComet(cometTexture, 40, 0.001);
+        const hyakutakeComet = createComet(cometTexture, 45, 0.0009);
+        const haleBoppComet = createComet(cometTexture, 50, 0.0008);
+
+        // Speed Control
+        const speedButton = document.getElementById('speedButton');
+        speedButton.addEventListener('click', () => {
+            if (speedMultiplier === 1) {
+                speedMultiplier = 2;
+                speedButton.textContent = '1x Speed';
+            } else {
+                speedMultiplier = 1;
+                speedButton.textContent = '2x Speed';
+            }
+        });
+
+        // Animation
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = Date.now() * 0.001;
+            planetData.forEach((data, index) => {
+                const planet = planets[index];
+                planetAngles[data.name] += data.speed * speedMultiplier;
+                planet.position.x = Math.cos(planetAngles[data.name]) * data.distance;
+                planet.position.z = Math.sin(planetAngles[data.name]) * data.distance;
+            });
+
+            moonAngle += 0.03 * speedMultiplier;
+            moon.position.x = Math.cos(moonAngle) * moon.distanceFromEarth + planets[2].position.x;
+            moon.position.z = Math.sin(moonAngle) * moon.distanceFromEarth + planets[2].position.z;
+
+            cometAngles.halleyComet += halleysComet.speed * speedMultiplier;
+            halleysComet.position.x = Math.cos(cometAngles.halleyComet) * halleysComet.distance;
+            halleysComet.position.z = Math.sin(cometAngles.halleyComet) * halleysComet.distance;
+
+            cometAngles.hyakutakeComet += hyakutakeComet.speed * speedMultiplier;
+            hyakutakeComet.position.x = Math.cos(cometAngles.hyakutakeComet) * hyakutakeComet.distance;
+            hyakutakeComet.position.z = Math.sin(cometAngles.hyakutakeComet) * hyakutakeComet.distance;
+
+            cometAngles.haleBoppComet += haleBoppComet.speed * speedMultiplier;
+            haleBoppComet.position.x = Math.cos(cometAngles.haleBoppComet) * haleBoppComet.distance;
+            haleBoppComet.position.z = Math.sin(cometAngles.haleBoppComet) * haleBoppComet.distance;
+
+            renderer.render(scene, camera);
+            controls.update();
+        }
+
+        animate();
+    </script>
+</body>
+</html>
