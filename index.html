@@ -1,173 +1,156 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Orrery Web App</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-        }
-        canvas {
-            display: block;
-        }
-        .controls {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            z-index: 100;
-        }
-        .controls button {
-            padding: 10px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-    </style>
-</head>
-<body>
-    <div class="controls">
-        <button id="speedButton">2x Speed</button>
-    </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script>
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+<!doctype html>
+<html xmlns:fb="http://ogp.me/ns/fb#">
+	<head>	
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+		<meta name="author" content="Martin Vézina, La Grange">
+		<title>jsOrrery - Javascript Solar System Simulator</title>
+		<style>
+			body {
+				opacity: 0;
+			}
+		</style>
+		<meta property="og:title" content="jsOrrery - Solar System Simulator" /> 
+		<meta property="og:image" content="https://mgvez.github.io/jsorrery/img/jsorrery_likefb.jpg" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:description" content="See the Solar System in your browser with jsOrrery, a Javascript / WebGL orbital mechanics simulator." />
+		<meta property="og:url" content="https://mgvez.github.io/jsorrery/" />
+		<meta name="twitter:creator" content="@m_vezina" />
+		<meta property="fb:app_id" content="400609246982045" />
+		<link rel="canonical" href="https://mgvez.github.io/jsorrery/" />
+		<link href='http://fonts.googleapis.com/css?family=Quattrocento' rel='stylesheet' type='text/css'>
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" type="text/css">
+	<link href="jsorrery.css" rel="stylesheet"></head>
+	<body id="jsorrery">
+		<nav id="gui">
+			
+			<div id="status">
+				<div id="startCont" class="inputContainer"></div>
+				<div id="dateDisplay"></div>
+			</div>
+			<label id="scenarioLabel">
+				<div>Scenario <span class="help fa fa-question-circle" data-for="helpScenario">&nbsp;</span></div>
+				<div id="scenarioCont" class="inputContainer"></div>
+			</label>
+			<label id="dateLabel">
+				<div>Date <span class="help fa fa-question-circle" data-for="helpDate">&nbsp;</span></div>
+				<div id="dateCont" class="inputContainer"></div>
+			</label>
+			<label id="lookFromLabel">
+				<div>Point of view <span class="help fa fa-question-circle" data-for="helpLookFrom">&nbsp;</span></div>
+				<div id="lookFromCont" class="inputContainer"></div>
+			</label>
 
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        camera.position.set(20, 10, 30);
-        controls.update();
+			<label id="geolocLabel">
+				<div>Lat/Lng</div>
+				<div id="geolocCont" class="inputContainer"></div>
+			</label>
+			
+			<label id="lookAtLabel">
+				<div>Look at <span class="help fa fa-question-circle" data-for="helpLookAt">&nbsp;</span></div>
+				<div id="lookAtCont" class="inputContainer"></div>
+			</label>
+			<label id="planetScaleLabel">
+				<div>Planet Scale <span class="valDisplay"></span>x <span class="help fa fa-question-circle" data-for="helpScale">&nbsp;</span></div>
+				<div id="planetScaleCont" class="inputContainer"></div>
+			</label>
+			<label id="deltaTLabel">
+				<div>Animation speed <span class="help fa fa-question-circle" data-for="helpDeltaT">&nbsp;</span></div>
+				<div id="deltaTCont" class="inputContainer"></div>
+			</label>
 
-        // Add Sun
-        const sunGeometry = new THREE.SphereGeometry(2, 32, 32);
-        const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
-        const sun = new THREE.Mesh(sunGeometry, sunMaterial);
-        scene.add(sun);
+			
+			
+			
 
-        // Planet Data
-        const planetData = [
-            { name: 'Mercury', color: 0xaaaaaa, radius: 0.38, distance: 4, speed: 0.03 },
-            { name: 'Venus', color: 0xffcc99, radius: 0.95, distance: 6, speed: 0.02 },
-            { name: 'Earth', color: 0x0000ff, radius: 1, distance: 8, speed: 0.015 },
-            { name: 'Mars', color: 0xff5733, radius: 0.53, distance: 11, speed: 0.012 },
-            { name: 'Jupiter', color: 0xffcc00, radius: 1.9, distance: 15, speed: 0.008 },
-            { name: 'Saturn', color: 0xffcc99, radius: 1.6, distance: 20, speed: 0.007 },
-            { name: 'Uranus', color: 0x66ccff, radius: 1.4, distance: 25, speed: 0.005 },
-            { name: 'Neptune', color: 0x0033cc, radius: 1.3, distance: 30, speed: 0.004 },
-        ];
+			<div id="navCollapse" class="fa fa-angle-double-up"></div>
+		</nav>
+		
 
-        let speedMultiplier = 1;
-        let planetAngles = {};
-        let moonAngle = 0;
-        let cometAngles = { halleysComet: 0, hyakutakeComet: 0, haleBoppComet: 0 };
 
-        const planets = planetData.map(data => {
-            const geometry = new THREE.SphereGeometry(data.radius, 32, 32);
-            const material = new THREE.MeshBasicMaterial({ color: data.color });
-            const planet = new THREE.Mesh(geometry, material);
-            planet.name = data.name;
-            planet.distance = data.distance;
-            planet.speed = data.speed;
-            planetAngles[data.name] = 0;
-            scene.add(planet);
-            return planet;
-        });
+		<div class="helpContent" id="helpScenario">
+			<a class="close fa fa-close">&nbsp;</a>
+			<h2>Scenario</h2>
+			<p>The available scenarios are in fact collections of numbers that describe celestial bodies and their position. These numbers are coming, for the most part, from Nasa's websites. Their accuracy is quite impressive, more than enough for the context of this simulation. The picture that you see on any given date represents what the real Solar System looked like on that date.</p>
+		</div>
+		<div class="helpContent" id="helpDate">
+			<a class="close fa fa-close">&nbsp;</a>
+			<h2>Date</h2>
+			<p>The <a href="http://en.wikipedia.org/wiki/Orbital_elements" target="_blank">orbital elements</a> of the planets are used to calculate their original position when picking a date. These calculations produce a very good approximation of the positions : you can compare the stars and constellations that you see in the background from other sources, provided that you place the point of view on The Earth.</p>
+			<p>Some scenarios are set to be animated by calculating positions from the orbital elements, but in some cases the velocity of each planet is derived from these calculations so that the positions are no longer calculated from the elements, but from the gravity that is acting between the different bodies. The calculation of these forces is also an approximation using a Quadratic integration, and its precision decays over time. This decay is more pronounced in some scenarios.</p>
+			<p>You can find on the internet the dates of celestial events, for example eclipses or lunar phases, and check if you can observe them in this simulation.</p>
+			<p>Please note that I use the Gregorian calendar for all dates, whereas Nasa use the Julian calendar for dates before the Gregorian reform (before 1582-10-15).</p>
+			<p>It is also worth noting that I use the ELP2000-85 theory to compute the Moon's position, which is not the exact same theory used by Nasa to compute its eclipse canon, so that there are small differences in the position of the Moon, particularly for very ancient dates.</p> 
+		</div>
+		<div class="helpContent" id="helpLookFrom">
+			<a class="close fa fa-close">&nbsp;</a>
+			<h2>Point of view</h2>
+			<p>This option makes it possible to place the camera at the position of a planet of your choice, so you'd see the other planets from the point of view of the chosen one. From there you can zoom by scrolling.</p>
+			<p>The Free Camera is a camera that floats into space, and that you can move by scrolling and dragging. This camera always revolve around a point specified in the "look at" option field.</p>
+		</div>
+		<div class="helpContent" id="helpLookAt">
+			<a class="close fa fa-close">&nbsp;</a>
+			<h2>Look at</h2>
+			<p>You can make your selected camera look at a planet of your choice, so that it always will be centered in your viewport.</p>
+			<p>If you place the camera from the viewpoint of a planet and look at another one, the latter's path will be traced relative to the former's position. This feature is useful to observe the <a href="http://en.wikipedia.org/wiki/Apparent_retrograde_motion" target="_blank">apparent retrograde motion</a> of the planets relative to the Earth.</p>
+		</div>
+		<div class="helpContent" id="helpScale">
+			<a class="close fa fa-close">&nbsp;</a>
+			<h2>Planet scale</h2>
+			<p>When the scale is at 1x, the planets sizes are in 1:1 scale to the size of the orbits, and of the universe. Since the distances in the Solar System are so huge, we can't even see the planets at this scale, so I made it possible to make the planets larger to see them more easily. I left the possibility to view them at their real size, because I feel it gives a better hint about the vastness of our Solar System.</p>
+		</div>
+		<div class="helpContent" id="helpDeltaT">
+			<a class="close fa fa-close">&nbsp;</a>
+			<h2>Speed</h2>
+			<p>Move the slider to change animation speed. Depending on the scenario, precision of positions can decay with increased speed.</p>
+		</div>
+		<div class="helpContent" id="helpCredits">
+			<a class="close fa fa-close">&nbsp;</a>
+			<h2>Credits</h2>
+			<p>
+				<a href="http://la-grange.ca"><img src="img/logo-la-grange.png"></a>
+			</p>
+			<p>Programming by <a href="http://lab.la-grange.ca/en/martin-vezina">Martin Vézina</a>, <a href="http://la-grange.ca">La Grange</a>, 2013-2017.</p>
+			<p><a href="https://twitter.com/m_vezina" class="twitter-follow-button" data-show-count="false">Follow @m_vezina</a><script async src="//platform.twitter.com/widgets.js" charset="utf-8"></script></p>
 
-        // Add Earth's Moon
-        const moonGeometry = new THREE.SphereGeometry(0.27, 32, 32);
-        const moonMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
-        const moon = new THREE.Mesh(moonGeometry, moonMaterial);
-        moon.distanceFromEarth = 2;
-        scene.add(moon);
+			<p>See project on Github at <a href="https://github.com/mgvez/jsorrery">https://github.com/mgvez/jsorrery</a></p>
 
-        // Add Asteroid Belt
-        function createAsteroidBelt(radius, numAsteroids) {
-            for (let i = 0; i < numAsteroids; i++) {
-                const geometry = new THREE.SphereGeometry(0.1, 16, 16);
-                const material = new THREE.MeshBasicMaterial({ color: Math.random() * 0xffffff });
-                const asteroid = new THREE.Mesh(geometry, material);
-                const angle = Math.random() * Math.PI * 2;
-                const distance = radius + Math.random() * 1;
-                asteroid.position.set(Math.cos(angle) * distance, 0, Math.sin(angle) * distance);
-                scene.add(asteroid);
-            }
-        }
-        createAsteroidBelt(12, 100);
+			<h3>Special thanks</h3>
+			<ul>
 
-        // Add Orbits
-        function createOrbit(radius) {
-            const orbitGeometry = new THREE.RingGeometry(radius - 0.05, radius + 0.05, 64);
-            const orbitMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
-            const orbit = new THREE.Mesh(orbitGeometry, orbitMaterial);
-            orbit.rotation.x = Math.PI / 2;
-            scene.add(orbit);
-            return orbit;
-        }
-        planetData.forEach(data => createOrbit(data.distance));
-        createOrbit(12);
+				<li>Planets orbital elements from Nasa's <a href="http://ssd.jpl.nasa.gov/?planet_pos">Jet Propulsion Laboratory</a>.</li>
+				<li>I learned about calculating positions from orbital elements by reading these documents by <a href="http://www.stargazing.net/kepler/ellipse.html">Keith Burnett</a>, <a href="http://www.stjarnhimlen.se/comp/tutorial.html">Paul Schlyter</a> and <a href="http://ssd.jpl.nasa.gov/txt/aprx_pos_planets.pdf">E M Standish (JPL)</a>.</li>
+				<li>Planet texture maps are a courtesy of <a href="http://planetpixelemporium.com/planets.html">James Hastings-Trew</a>.</li>
+				<li>Stars coordinates from <a href="http://astronexus.com/">AstroNexus</a> and <a href="http://heasarc.gsfc.nasa.gov/docs/archive.html">Nasa</a>.</li>
+				<li>David Eagle for orbital calculations of the moon, based on "Lunar Tables and Programs From 4000 B.C. TO A.D. 8000" by Michelle Chapront-Touze and Jean Chapront. See <a href="http://www.mathworks.com/matlabcentral/fileexchange/39130-orbital-elements-of-the-moon">mathworks.com</a>.</li>
+				<li><a href="http://www.braeunig.us/apollo/">Bob Braeunig</a> for calculations of Apollo missions trans lunar injection trajectories.</li>
+				<li>Quadratic integrations from <a href="http://orbit.medphys.ucl.ac.uk/">Orbiter</a>'s documentaion by Martin Schweiger.</li>
+				<li><a href="http://clowder.net/hop/index.html">Hop David</a> for vis viva calculation of velocity.</li>
+				<li>I have found answers to many questions on random places across the internetz, places like <a href="http://stackoverflow.com">StackOverflow</a> or <a href="http://www.orbiter-forum.com/">Orbiter Forum</a>. There are a lot of helpful people out there.</li>
+				<li>Some techniques are inspired by Michael Chang's <a href="http://www.html5rocks.com/en/tutorials/casestudies/100000stars/">tutorial</a> of <a href="http://workshop.chromeexperiments.com/stars/">100,000 stars</a></li>
+				<li>And of course, many thanks to <a href="http://www.mrdoob.com/">Mr Doob</a> for the excellent <a href="http://threejs.org/">three.js</a></li>
+			</ul>
+		</div>
+			
+		<div class="preload">
+			<div class="orbit"><div class="planet"></div></div>
+			<div class="title">
+				<h1>jsorrery</h1>
+				<h2>solar system</h2>
+			</div>
+		</div>
 
-        // Add Comets
-        function createComet(color, distance, speed) {
-            const cometGeometry = new THREE.SphereGeometry(0.2, 16, 16);
-            const cometMaterial = new THREE.MeshBasicMaterial({ color });
-            const comet = new THREE.Mesh(cometGeometry, cometMaterial);
-            comet.distance = distance;
-            comet.speed = speed;
-            scene.add(comet);
-            return comet;
-        }
-        const halleysComet = createComet(0xffffff, 40, 0.001);
-        const hyakutakeComet = createComet(0xff0000, 45, 0.0009);
-        const haleBoppComet = createComet(0x00ff00, 50, 0.0008);
+		<div id="credits" class="help fa fa-question-circle" data-for="helpCredits">credits</div>
+		<script src="assets/data/elp.js"></script>
+		<script src="assets/data/vsop-earth.js"></script>
+		<script>
 
-        // Speed Control
-        const speedButton = document.getElementById('speedButton');
-        speedButton.addEventListener('click', () => {
-            if (speedMultiplier === 1) {
-                speedMultiplier = 2;
-                speedButton.textContent = '1x Speed';
-            } else {
-                speedMultiplier = 1;
-                speedButton.textContent = '2x Speed';
-            }
-        });
+			window.onJsOrreryLoaded = function(JSOrrery){
+				const jsOrrery = new JSOrrery('jsorrery');
+				jsOrrery.loadDefaultScenario();
+			}
 
-        // Animation
-        function animate() {
-            requestAnimationFrame(animate);
-
-            const time = Date.now() * 0.001;
-            planetData.forEach((data, index) => {
-                const planet = planets[index];
-                planetAngles[data.name] += data.speed * speedMultiplier;
-                planet.position.x = Math.cos(planetAngles[data.name]) * data.distance;
-                planet.position.z = Math.sin(planetAngles[data.name]) * data.distance;
-            });
-
-            moonAngle += 0.03 * speedMultiplier;
-            moon.position.x = Math.cos(moonAngle) * moon.distanceFromEarth + planets[2].position.x;
-            moon.position.z = Math.sin(moonAngle) * moon.distanceFromEarth + planets[2].position.z;
-
-            cometAngles.halleyComet += halleysComet.speed * speedMultiplier;
-            halleysComet.position.x = Math.cos(cometAngles.halleyComet) * halleysComet.distance;
-            halleysComet.position.z = Math.sin(cometAngles.halleyComet) * halleysComet.distance;
-
-            cometAngles.hyakutakeComet += hyakutakeComet.speed * speedMultiplier;
-            hyakutakeComet.position.x = Math.cos(cometAngles.hyakutakeComet) * hyakutakeComet.distance;
-            hyakutakeComet.position.z = Math.sin(cometAngles.hyakutakeComet) * hyakutakeComet.distance;
-
-            cometAngles.haleBoppComet += haleBoppComet.speed * speedMultiplier;
-            haleBoppComet.position.x = Math.cos(cometAngles.haleBoppComet) * haleBoppComet.distance;
-            haleBoppComet.position.z = Math.sin(cometAngles.haleBoppComet) * haleBoppComet.distance;
-
-            controls.update();
-            renderer.render(scene, camera);
-        }
-        animate();
-    </script>
-</body>
+		</script>
+	<script type="text/javascript" src="jsorrery.js"></script></body>
 </html>
